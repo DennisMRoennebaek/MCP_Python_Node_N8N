@@ -1,0 +1,51 @@
+services:
+  fastapi:
+    build: ./SimpleApi
+    ports:
+      - "8000:8000"
+    command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  mcp:
+    build: ./NodeMCP
+    environment:
+      - PORT=3000
+      - FASTAPI_BASE=http://fastapi:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - fastapi
+    command: ["node", "dist/mcp-server.js"]  # or dist/http-mcp.js if that's your compiled filename
+
+  n8n:
+    image: n8nio/n8n:latest
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      # Optional but recommended so your workflows persist:
+      - N8N_ENCRYPTION_KEY=replace_with_a_long_random_string
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      - mcp
+
+  ollama:
+      image: ollama/ollama:latest
+      ports:
+        - "11434:11434"
+      volumes:
+        - ollama_data:/root/.ollama
+      deploy:
+        resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                count: all
+                capabilities: [gpu]
+
+volumes:
+  n8n_data:
+  ollama_data:
